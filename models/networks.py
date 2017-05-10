@@ -9,8 +9,6 @@ import numpy as np
 
 
 def weights_init(m):
-    pass
-    '''
     classname = m.__class__.__name__
     if classname.find('Conv') != -1:
         try:
@@ -23,7 +21,6 @@ def weights_init(m):
             m.bias.data.fill_(0)
         except:
             pass
-    '''
 
 
 def define_G(input_nc, output_nc, ngf, which_model_netG, norm, use_dropout=False, gpu_ids=[]):
@@ -390,7 +387,7 @@ def conv_block(in_dim,out_dim,act_fn):
     model = nn.Sequential(
         nn.Conv2d(in_dim,out_dim, kernel_size=3, stride=1, padding=1),
         nn.BatchNorm2d(out_dim),
-        act_fn,
+        act_fn
     )
     return model
 
@@ -399,7 +396,7 @@ def conv_trans_block(in_dim,out_dim,act_fn):
     model = nn.Sequential(
         nn.ConvTranspose2d(in_dim,out_dim, kernel_size=3, stride=2, padding=1,output_padding=1),
         nn.BatchNorm2d(out_dim),
-        act_fn,
+        act_fn
     )
     return model
 
@@ -425,11 +422,11 @@ class Conv_residual_conv(nn.Module):
         super(Conv_residual_conv,self).__init__()
         self.in_dim = in_dim
         self.out_dim = out_dim
-        self.act_fn = act_fn
+        act_fn = act_fn
 
-        self.conv_1 = conv_block(in_dim,out_dim,act_fn)
-        self.conv_2 = conv_block_3(out_dim,out_dim,act_fn)
-        self.conv_3 = conv_block(out_dim,out_dim,act_fn)
+        self.conv_1 = conv_block(self.in_dim,self.out_dim,act_fn)
+        self.conv_2 = conv_block_3(self.out_dim,self.out_dim,act_fn)
+        self.conv_3 = conv_block(self.out_dim,self.out_dim,act_fn)
 
     def forward(self,input):
         conv_1 = self.conv_1(input)
@@ -446,38 +443,54 @@ class FusionGenerator(nn.Module):
         self.in_dim = input_nc
         self.out_dim = ngf
         self.final_out_dim = output_nc
-        self.act_fn = nn.ReLU()
+        act_fn = nn.LeakyReLU(0.2, inplace=True)
+        act_fn_2 = nn.ReLU()
+
         print("\n------Initiating FusionNet------\n")
 
         # encoder
 
-        self.down_1 = nn.DataParallel(Conv_residual_conv(self.in_dim, self.out_dim,self.act_fn))
-        self.pool_1 = nn.DataParallel(maxpool())
-        self.down_2 = nn.DataParallel(Conv_residual_conv(self.out_dim, self.out_dim * 2,self.act_fn))
-        self.pool_2 = nn.DataParallel(maxpool())
-        self.down_3 = nn.DataParallel(Conv_residual_conv(self.out_dim * 2, self.out_dim * 4,self.act_fn))
-        self.pool_3 = nn.DataParallel(maxpool())
-        self.down_4 = nn.DataParallel(Conv_residual_conv(self.out_dim * 4, self.out_dim * 8,self.act_fn))
-        self.pool_4 = nn.DataParallel(maxpool())
+        self.down_1 = nn.DataParallel(Conv_residual_conv(self.in_dim, self.out_dim, act_fn))
+        self.pool_1 = maxpool()
+        self.down_2 = nn.DataParallel(Conv_residual_conv(self.out_dim, self.out_dim * 2, act_fn))
+        self.pool_2 = maxpool()
+        self.down_3 = nn.DataParallel(Conv_residual_conv(self.out_dim * 2, self.out_dim * 4, act_fn))
+        self.pool_3 = maxpool()
+        self.down_4 = nn.DataParallel(Conv_residual_conv(self.out_dim * 4, self.out_dim * 8, act_fn))
+        self.pool_4 = maxpool()
 
         # bridge
 
-        self.bridge = nn.DataParallel(Conv_residual_conv(self.out_dim * 8, self.out_dim * 16,self.act_fn))
+        self.bridge = nn.DataParallel(Conv_residual_conv(self.out_dim * 8, self.out_dim * 16, act_fn))
 
         # decoder
 
-        self.deconv_1 = nn.DataParallel(conv_trans_block(self.out_dim * 16, self.out_dim * 8,self.act_fn))
-        self.up_1 = nn.DataParallel(Conv_residual_conv(self.out_dim * 8, self.out_dim * 8,self.act_fn))
-        self.deconv_2 = nn.DataParallel(conv_trans_block(self.out_dim * 8, self.out_dim * 4,self.act_fn))
-        self.up_2 = nn.DataParallel(Conv_residual_conv(self.out_dim * 4, self.out_dim * 4,self.act_fn))
-        self.deconv_3 = nn.DataParallel(conv_trans_block(self.out_dim * 4, self.out_dim * 2,self.act_fn))
-        self.up_3 = nn.DataParallel(Conv_residual_conv(self.out_dim * 2, self.out_dim * 2,self.act_fn))
-        self.deconv_4 = nn.DataParallel(conv_trans_block(self.out_dim * 2, self.out_dim,self.act_fn))
-        self.up_4 = nn.DataParallel(Conv_residual_conv(self.out_dim, self.out_dim, self.act_fn))
+        self.deconv_1 = nn.DataParallel(conv_trans_block(self.out_dim * 16, self.out_dim * 8, act_fn_2))
+        self.up_1 = nn.DataParallel(Conv_residual_conv(self.out_dim * 8, self.out_dim * 8, act_fn_2))
+        self.deconv_2 = nn.DataParallel(conv_trans_block(self.out_dim * 8, self.out_dim * 4, act_fn_2))
+        self.up_2 = nn.DataParallel(Conv_residual_conv(self.out_dim * 4, self.out_dim * 4, act_fn_2))
+        self.deconv_3 = nn.DataParallel(conv_trans_block(self.out_dim * 4, self.out_dim * 2, act_fn_2))
+        self.up_3 = nn.DataParallel(Conv_residual_conv(self.out_dim * 2, self.out_dim * 2, act_fn_2))
+        self.deconv_4 = nn.DataParallel(conv_trans_block(self.out_dim * 2, self.out_dim, act_fn_2))
+        self.up_4 = nn.DataParallel(Conv_residual_conv(self.out_dim, self.out_dim, act_fn_2))
 
         # output
 
-        self.out = nn.DataParallel(nn.Conv2d(self.out_dim,self.final_out_dim, kernel_size=3, stride=1, padding=1))
+        #self.out = nn.DataParallel(nn.Conv2d(self.out_dim,self.final_out_dim, kernel_size=3, stride=1, padding=1))
+        self.out = nn.Sequential(
+            nn.Conv2d(self.out_dim,self.final_out_dim, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(self.final_out_dim),
+            nn.Tanh(),
+        )
+
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                m.weight.data.normal_(0.0, 0.02)
+                m.bias.data.fill_(0)
+            
+            elif isinstance(m, nn.BatchNorm2d):
+                m.weight.data.normal_(1.0, 0.02)
+                m.bias.data.fill_(0)
 
 
     def forward(self,input):
@@ -494,18 +507,19 @@ class FusionGenerator(nn.Module):
         bridge = self.bridge(pool_4)
 
         deconv_1 = self.deconv_1(bridge)
-        skip_1 = deconv_1 + down_4
+        skip_1 = (deconv_1 + down_4)
         up_1 = self.up_1(skip_1)
         deconv_2 = self.deconv_2(up_1)
-        skip_2 = deconv_2 + down_3
+        skip_2 = (deconv_2 + down_3)
         up_2 = self.up_2(skip_2)
         deconv_3 = self.deconv_3(up_2)
-        skip_3 = deconv_3 + down_2
+        skip_3 = (deconv_3 + down_2)
         up_3 = self.up_3(skip_3)
         deconv_4 = self.deconv_4(up_3)
-        skip_4 = deconv_4 + down_1
+        skip_4 = (deconv_4 + down_1)
         up_4 = self.up_4(skip_4)
 
         out = self.out(up_4)
+        #out = torch.clamp(out, min=-1, max=1)
 
         return out
